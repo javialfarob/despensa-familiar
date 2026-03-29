@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Despensa</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f5f5f5; color: #222; }
+    header { background: #2d6a4f; color: white; padding: 16px 20px; font-size: 20px; font-weight: bold; }
+    main { padding: 20px; max-width: 600px; margin: 0 auto; }
+    .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    h2 { font-size: 16px; margin-bottom: 12px; color: #2d6a4f; }
+    input, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 8px; border: 1px solid #ddd; font-size: 15px; }
+    button { background: #2d6a4f; color: white; border: none; cursor: pointer; font-weight: bold; }
+    button:active { opacity: 0.8; }
+    ul { list-style: none; }
+    li { padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    li:last-child { border-bottom: none; }
+    #estado { font-size: 13px; color: #888; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header>Mi Despensa</header>
+  <main>
+    <div class="card">
+      <h2>Agregar producto</h2>
+      <input type="text" id="nombre" placeholder="Nombre del producto (ej: leche)">
+      <input type="number" id="cantidad" placeholder="Cantidad (ej: 2)">
+      <input type="text" id="unidad" placeholder="Unidad (ej: litros, kg, unidades)">
+      <input type="date" id="vencimiento">
+      <button onclick="agregarProducto()">Guardar en inventario</button>
+      <p id="estado"></p>
+    </div>
+
+    <div class="card">
+      <h2>Inventario actual</h2>
+      <ul id="lista-inventario">
+        <li>Cargando...</li>
+      </ul>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, orderBy, query }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // 👇 REEMPLAZA ESTO CON TU CONFIGURACIÓN DE FIREBASE
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_PROYECTO.firebaseapp.com",
+      projectId: "TU_PROJECT_ID",
+      storageBucket: "TU_PROYECTO.appspot.com",
+      messagingSenderId: "TU_SENDER_ID",
+      appId: "TU_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.agregarProducto = async function() {
+      const nombre = document.getElementById("nombre").value.trim();
+      const cantidad = document.getElementById("cantidad").value;
+      const unidad = document.getElementById("unidad").value.trim();
+      const vencimiento = document.getElementById("vencimiento").value;
+      const estado = document.getElementById("estado");
+
+      if (!nombre || !cantidad) {
+        estado.textContent = "Ingresa al menos nombre y cantidad.";
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, "inventario"), {
+          nombre, cantidad: Number(cantidad), unidad, vencimiento,
+          creadoEn: new Date().toISOString()
+        });
+        estado.textContent = "Guardado correctamente.";
+        document.getElementById("nombre").value = "";
+        document.getElementById("cantidad").value = "";
+        document.getElementById("unidad").value = "";
+        document.getElementById("vencimiento").value = "";
+      } catch (e) {
+        estado.textContent = "Error al guardar: " + e.message;
+      }
+    };
+
+    // Escuchar cambios en tiempo real
+    const q = query(collection(db, "inventario"), orderBy("creadoEn", "desc"));
+    onSnapshot(q, (snapshot) => {
+      const lista = document.getElementById("lista-inventario");
+      if (snapshot.empty) {
+        lista.innerHTML = "<li>No hay productos aún.</li>";
+        return;
+      }
+      lista.innerHTML = snapshot.docs.map(doc => {
+        const d = doc.data();
+        const vence = d.vencimiento ? ` · vence ${d.vencimiento}` : "";
+        return `<li><strong>${d.nombre}</strong> — ${d.cantidad} ${d.unidad}${vence}</li>`;
+      }).join("");
+    });
+  </script>
+</body>
+</html>
